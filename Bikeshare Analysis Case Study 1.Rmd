@@ -1,0 +1,532 @@
+---
+title: "Bike Share Analysis Case Study"
+author: "Nicole Bow"
+date: "2022-02-08"
+output: html_document
+css: "style.css"
+---
+
+## Introduction
+
+The following case study is an analysis of bike trip data from the past year. Different statistics will be looked at including trip duration, number of trips, and membership.
+
+The analysis follows the different phases of the data analysis process which
+you can find in the outline below:
+  
+  - [Objective](#objective)
+  - [Data Preparation](#data-preparation)
+  - [Analysis](#analysis)
+  - [Discussion](#discussion)
+  - [Recommendations](#recommendations)
+  - [Conclusion](#conclusion)
+  
+### Objective
+
+The purpose of this analysis is to help a bike share company figure out how to increase their yearly membership. Below is a short description of the company we're working with:
+
+> ***Company name:*** Cyclistic
+>
+> ***Description:*** Bikeshare company, founded in 2016
+>
+> ***Location:*** Chicago, IL (USA)
+>
+> ***Other stats:***
+>
+> - 5,824 bicycles registered 
+> - 4 different bike types (traditional, reclining, hand tricycles, cargo)
+> - 692 docking stations
+> - 3 different pricing plans (single-ride pass, full-day pass, annual membership)
+
+Our business task is to:
+
+> **figure out the differences between casual riders and annual members** of Cyclistic in order to help them come up with some marketing strategies.
+
+Our key stakeholders are:
+
+> - the  *Director of Marketing*
+> - the *Executive Team*.
+> _We can also move a step further and consider the *Marketing Team* our secondary stakeholders._
+
+## Data Wrangling
+
+Before we get started on the data, we need to ensure we have the correct packages running to be able to conduct the analysis. The packages used throughout the case study are:
+
+ - `data.table`: _helps with faster importing and writing of csv files_
+ - `tidyverse`: _helps with data wrangling, transformation and visualisation_
+ - `lubridate`: _helps with date parsing and time-date calculations_
+ - `skimr`: _helps with summary statistics_
+ - `janitor`: _helps with data cleaning_
+ - `ggplot2`: _helps with visualisations_
+
+```{r cache=TRUE, include=FALSE, eval = TRUE}
+library(data.table)
+library(tidyverse)
+library(lubridate) 
+library(dplyr)
+library(skimr)
+library(janitor)
+library(ggplot2)
+
+```
+
+First of all, we need to download the data from the provided company repository.We are only looking at 12 months of data so we only need to download the data sets representing the latest 12 months.
+
+We'll start by uploading each of the 12 data sets.
+
+```{r eval= c(13, 14), echo=13, cache=TRUE, include=TRUE, results='markup'}
+df1 <- fread("TripData_2021_05.csv")
+df2 <- fread("TripData_2021_06.csv")
+df3 <- fread("TripData_2021_07.csv")
+df4 <- fread("TripData_2021_08.csv")
+df5 <- fread("TripData_2021_09.csv")
+df6 <- fread("TripData_2021_10.csv")
+df7 <- fread("TripData_2021_11.csv")
+df8 <- fread("TripData_2021_12.csv")
+df9 <- fread("TripData_2022_01.csv")
+df10 <- fread("TripData_2022_02.csv")
+df11 <- fread("TripData_2022_03.csv")
+df12 <- fread("TripData_2022_04.csv")
+df13 <- fread("TripData_2022_05.csv")
+head(df13)
+
+```
+
+Each of the data sets are csv files with different metrics such as the length and date of the bike rides, the bike stations, and the rider's ID. After looking through the data, these are the following issues noted that need to be cleaned:
+
+1. Between `2021_05` and `2021_11` there are very few station details recorded (`name` and `id`). 
+2. Starting `2021_12` the `stations names` are included, but `station ids` remain inconsistent throughout the data.
+
+
+It would make more sense to sort the issues highlighted above when working with a merged data frame. To do this, we need to look over each data frame to ensure the column names are similar:
+
+```{r eval= 13, echo= 13, cache=TRUE, include=TRUE, results='markup'}
+colnames(df1)
+colnames(df2)
+colnames(df3)
+colnames(df4)
+colnames(df5)
+colnames(df6)
+colnames(df7)
+colnames(df8)
+colnames(df9)
+colnames(df10)
+colnames(df11)
+colnames(df12)
+colnames(df13)
+
+```
+
+
+All the data frames have similar column names. We can also check the data types and have an overview of the columns to confirm if there are any inconsistencies:
+
+```{r eval= 13, echo=13, cache=TRUE, results='markup'}
+str(df1)
+str(df2)
+str(df3)
+str(df4)
+str(df5)
+str(df6)
+str(df7)
+str(df8)
+str(df9)
+str(df10)
+str(df11)
+str(df12)
+str(df13)
+
+```
+
+After confirming that all the data types and column names are consistent, we can go ahead and merge all the data frames.
+
+```{r eval=FALSE, echo=TRUE, cache=FALSE, include=FALSE}
+trip_data <- bind_rows(df1, df2, df3, df4, df5, df6, df7, df8, df9, df10, df11, df12, df13)
+
+```
+
+### Data Cleaning
+
+Because the data cleaning process might involve the removal of some data, we will go ahead and save a copy of the newly created data frame to the local machine, as well as create a copy of the data to work with moving forward.
+
+```{r eval=FALSE, cache=FALSE, include=FALSE}
+fwrite(trip_data, "Trip_Data_Merged.csv")
+
+```
+
+```{r eval= TRUE, echo= 2, cache=TRUE, include= TRUE, results='markup'}
+trip_data <- fread("Trip_Data_Merged.csv")
+head(trip_data)
+
+```
+
+We'll remove the inconsistent columns like the station names and the station coordinates since a lot of data frames had many missing values:
+
+```{r echo=TRUE, eval=TRUE, cache=TRUE, include=TRUE, results='markup'}
+trip_data <- trip_data %>%  
+  select(ride_id, rideable_type, started_at, ended_at, member_casual)
+head(trip_data)
+
+```
+
+We'll rename the columns to make the names shorter. This is not a necessary step, but it makes the cleaning steps and analysis easier:
+
+```{r echo=TRUE, include=TRUE, cache=TRUE, eval=TRUE, results='markup' }
+trip_data <- trip_data %>% 
+  rename(id=ride_id) %>% 
+  rename(start=started_at) %>% 
+  rename(end=ended_at) %>% 
+  rename(membership=member_casual) %>% 
+  rename(bike=rideable_type)
+colnames(trip_data)
+
+```
+
+Because we have a date column and we could generate some important insights from this, we will go ahead and create different columns representing the day, month and year as well as the actual day of the week. We will also change the data type of each of these columns:
+
+```{r echo=7, eval=TRUE, cache=TRUE, include=TRUE, results='markup'}
+trip_data$date <- as.Date(trip_data$start)
+trip_data$month <- format(as.Date(trip_data$date), "%m")
+trip_data$day <- format(as.Date(trip_data$date), "%d")
+trip_data$year <- format(as.Date(trip_data$date), "%Y")
+trip_data$day_of_week <- format(as.Date(trip_data$date), "%A")
+trip_data$day_of_week <- ordered(trip_data$day_of_week, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+str(trip_data)
+
+```
+
+Next, we're going to add another column called `duration` that represents the length of the ride.We're going to manually calculate this using the `start` and `end` columns. We will also convert this column data type from the default which would be a `factor` data type to `numeric` so that we can perform calculations on it later:
+
+```{r echo=3, eval=TRUE, cache=TRUE, include=TRUE, results='markup'}
+trip_data$duration <- difftime(trip_data$end,trip_data$start)
+trip_data$duration <- as.numeric(as.character(trip_data$duration))
+str(trip_data)
+
+```
+
+Next, we'll remove all the missing values:
+
+```{r cache=FALSE, eval=FALSE, include=FALSE}
+trip_data <- na.omit(trip_data)
+
+```
+
+Finally, we'll save a copy of the cleaned data frame in case anything goes wrong in the analysis and we need to revert to it:
+
+```{r echo=TRUE, eval=FALSE, cache=FALSE, include=FALSE}
+fwrite(trip_data, "Trip_Data_Cleaned.csv")
+
+```
+
+```{r cache=TRUE, include=FALSE, eval=TRUE, echo=TRUE}
+trips <- trip_data
+
+```
+
+## Analysis
+
+In this section, we'll perform a few calculations and have a few visualisations to get some insights on the different trends and relationships in the data.
+
+#### Membership
+
+Given that this is supposed to be our primary focus, we can go ahead and count how many trips were had by both casual and member riders we have in total:
+
+```{r echo=TRUE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+nrow(trips[trips$membership == "casual"])
+nrow(trips[trips$membership == "member"])
+
+```
+> ***Observation:***
+>
+> From the above we can see that there are more member riders ($3,575,636$) than casual riders ($2,816,773$).
+
+
+#### Duration
+Next, we are going to get the descriptive statistics for the duration:
+
+```{r echo=TRUE, cache=TRUE, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, results='markup'}
+summary(trips$duration)
+
+```
+We can see that the minimum trip duration is `-3482 seconds` which is not accurate, because that means the end time was before the start time. Bearing in mind that data cleaning is an iterative process, we can go ahead and try and see how many trips have a duration of 0 and less to ensure that we are working with accurate data:
+
+```{r echo=TRUE, cache=TRUE, cache=TRUE, include=TRUE}
+
+short_trips <- filter(trips, duration <= 0)
+dim(short_trips)
+
+```
+
+Given that there are $700$ rides with a duration of zero, we can go ahead and create a new data frame that does not include trips that are less than 60 seconds(1 minute).
+
+```{r cache=TRUE, include=FALSE, echo=TRUE, eval=TRUE}
+trips <- filter(trips, duration > 60)
+
+```
+
+We can check the summary stats once again, bearing in mind that the minimum will ride will be at least 60 seconds:
+
+```{r echo=FALSE, cache=TRUE, include=TRUE, eval=TRUE, message=FALSE, warning=FALSE, results='markup'}
+summary(trips$duration)
+
+```
+
+We can also plot that on a simple histogram and look at the distribution of duration:
+
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+ggplot(trips, aes(x = duration))+
+  geom_histogram(color = "darkblue", fill = "darkblue", bins = 30)+
+  scale_y_continuous(trans = "log2")+
+  scale_x_continuous(breaks = seq(0, 3400000, 500000))+
+  labs(x = "duration (secs)", title = "Duration Distributions of All Trips")
+```
+From the above diagram, we can see that there were still outliers in the data set. We can go ahead and create a new data frame by removing all trips that are more than $1,000,000$ seconds since these are typically less than 16 for each bin in the diagram. We will also counter check the summary stats once again and create a new plot after:
+
+```{r echo=FALSE, cache=TRUE, include=TRUE, results='markup'}
+trips = filter(trips, duration < 1000000)
+summary(trips$duration)
+
+```
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+ggplot(trips, aes(x = duration))+
+  geom_histogram(color = "darkblue", fill = "darkblue", bins = 30)+
+  scale_y_continuous(trans = "log2")+
+  scale_x_continuous(breaks = seq(0, 1000000, 50000))+
+  theme(axis.text.x=element_text(angle=45))
+  labs(x = "duration (secs)", title = "Duration Distributions of All Trips (Outliers removed)")
+
+```
+
+> ***Observations:***
+>
+> We can see the the mean trips duration is $1,268$ seconds (24.7 minutes) >with the previous data set, and $1,289$ seconds (21.4 minutes) with the >cleaned dataset. The longest trips duration is $3,356,649$ seconds (38 days) >and the shortest trip was $61$ seconds (1 minute). This did not seem >accurate so we removed more outliers and found the new mean to be $1251$ >seconds (20.8 minutes). The longest trip now stands at $998,375$ seconds (11.5 days).
+>
+> From the first distribution, we can see that most trips are less than $125,000$ seconds (1.4days). There are also pockets of trips that are much longer than $1,000,000$ seconds (11.5 days). From the second distribution, we can see that most trips are less than $10,000$ seconds (2.7 hours).
+
+#### Duration Vs. Membership
+
+From the previous section, we saw that there were still outliers in the data set. We can go ahead and remove all trips that are more than $1,000,000$ seconds since these are typically less than 16 for each bin in the diagram. We'll also counter check the summary stats once again:
+
+As we can see from above, the mean has now changed to
+
+We can also compute the same statistics and compare the `casual` vs `member` membership types. For clarification purposes:
+
+1. Casual riders constitute of people who subscribe for single and day passes.
+2. Members are people who have paid for annual passes.
+
+```{r echo=FALSE, cache=TRUE, include=TRUE, results='markup'}
+aggregate(trips$duration ~ trips$membership, FUN = mean)
+aggregate(trips$duration ~ trips$membership, FUN = median)
+aggregate(trips$duration ~ trips$membership, FUN = max)
+aggregate(trips$duration ~ trips$membership, FUN = min)
+
+```
+Out of curiosity, it would be good to know the number of trips that were more than a million seconds in duration. We'll use the first data frame to figure this out:
+
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning= FALSE}
+long_trips <- filter(trip_data, duration > 1000000)
+data.frame(long_trips)
+long_trips %>% 
+  group_by(membership) %>% 
+  summarise(num_rides = n()) %>% 
+  arrange(num_rides)
+
+```
+
+
+We can go ahead and plot the average duration for the two membership types on a bar chart since we're working with categorical and continuous data:
+
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+trips %>%
+  group_by(membership) %>%
+  summarise(avg_duration = mean(duration)) %>%
+  ggplot(aes(x = membership, y = avg_duration))+
+  geom_col(position = "dodge")+
+  labs(x = "membership", y = "average duration (secs)", title = "Average Duration Vs Membership")
+  
+```
+
+> ***Observations:***
+>
+> From the above we can see that casual riders have higher trip durations than members across all categories except the minimum, which is similar for both. Particularly focusing on the mean, causal riders have a mean trip duration of $1,817$  seconds (30 minutes) while members have a mean trip duration of $803$ seconds (13 minutes).
+>
+> All rides that were above $1,000,000$ seconds (11.5 days) can be attributed to casual riders.
+
+
+#### Duration Vs. Membership Vs. Day of Week
+
+We'll need to look at the trip durations' descriptive statistics by day and membership in order to get some additional insights:
+
+```{r echo=FALSE, cache=TRUE, eval=TRUE, include=TRUE, results='markup'}
+aggregate(trips$duration ~ trips$membership + trips$day_of_week, FUN = mean)
+
+```
+
+We can go ahead and create a clustered bar chart showing the average ride duration against the day of the week, and grouped by membership:
+
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+trips_2 <- trips
+trips_2 %>%
+  mutate(weekday = wday(start, label = TRUE)) %>% 
+  group_by(membership, weekday) %>% 
+  summarise(num_rides = n()
+            ,avg_duration = mean(duration)) %>% 
+  arrange(membership, weekday)  %>% 
+  ggplot(aes(x = weekday, y = avg_duration, fill = membership)) +
+  geom_col(position = "dodge")+
+   labs(x = "membership", y = "average duration (secs)", legend = "membership type", title = "Average Duration Vs Membership Vs Weekday")
+```
+
+> ***Observations:***
+>
+> Casual riders have higher average trips durations than members on all days of the week.
+>
+> **Sunday** has the longest trips overall with casual riders averaging `2363 seconds` (39 minutes) and members averaging `1079 seconds` (17 minutes).
+>
+> **Tuesday** has the shortest trips overall with casual riders averaging `1761 seconds`(29 minutes) and members averaging `909 seconds` (15 minutes). 
+
+#### Duration Vs. Number of Rides Vs. Membership Vs. Weekday
+
+Given the above observations, it would be interesting to compare the number of rides as well as the average duration during the different days of the week:
+
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE}
+trips %>% 
+  mutate(weekday = wday(start, label = TRUE)) %>%
+  group_by(membership, weekday) %>%
+  summarise(num_rides = n(),avg_duration = mean(duration)) %>% 
+  arrange(membership, weekday)	
+
+```
+The above data, with a focus on number of rides, will be plotted have a visual representation of the data:
+
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+trips_2 %>% 
+  mutate(weekday = wday(start, label = TRUE)) %>% 
+  group_by(membership, weekday) %>% 
+  summarise(num_rides = n()
+            ,avg_duration = mean(duration)) %>% 
+  arrange(membership, weekday)  %>% 
+  ggplot(aes(x = weekday, y = num_rides, fill = membership)) +
+  geom_col(position = "dodge")+
+  scale_y_continuous(trans = "log2")+
+  labs(x = "weekday", y = "number of rides", legend = "membership type", title = "Number of Rides Vs Membership Vs Weekday")
+
+```
+
+> ***Observations:***
+>
+> For casual riders, we can see that **Saturday** has highest number of trips ($565,155$) whereas **Sunday** has the longest average ride duration. 
+>
+> For members, we can see that Tuesday actually has the highest number of trips ($424,425$) and **Sunday** has the longest average duration.
+>
+> Based on the number of trips:
+>
+>   - Member riders overall take more trips than casual riders on all days of the week apart from Saturdays and Sundays.
+>   - **Weekends** (Friday, Saturday and Sunday) are the most popular days for casual riders.
+>   - **Mid-week** (Tuesday, Wednesday, amd Thursday) are the most popular days for members.
+
+
+#### Duration vs Month Vs Membership
+Given that the primary problem highlighted was converting casual riders to annual members, I thought it would be worth taking a look at the data on a monthly scale and see if there are any interesting trend we can see over the past 12 months.
+
+We'll first start by creating a year-month column given that there are some months that are represented in both 2021 and 2022:
+
+```{r echo=3, eval=TRUE, cache=TRUE, include=TRUE, results = "markup"}
+trips$year_month <- format(as.Date(trips$date), "%b %y")
+trips$year_month <- ordered(trips$year_month, levels = c("May 21", "Jun 21", "Jul 21", "Aug 21", "Sep 21", "Oct 21", "Nov 21", "Dec 21", "Jan 22", "Feb 22", "Mar 22", "Apr 22", "May 22"))
+str(trips)
+
+```
+Now we can go ahead and calculate the summary stats on the average duration and number of trips for each month in the data set:
+
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning= FALSE}
+trips %>% 
+  group_by(membership, year_month) %>% 
+  summarise(num_rides = n()
+            ,avg_duration = mean(duration)) %>% 
+  arrange(avg_duration)
+
+```
+
+Now we'll create a simple column chart to represent the average duration of the trips per month and separate them by membership:
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+trips %>% 
+  group_by(membership, year_month) %>% 
+  summarise(num_rides = n()
+            ,avg_duration = mean(duration)) %>% 
+  arrange(membership, year_month)  %>% 
+  ggplot(aes(x = year_month, y = avg_duration, fill = membership)) +
+  geom_col(position = "dodge")+
+  scale_y_continuous(trans = "log2")+
+  theme(axis.text.x=element_text(angle=45))+
+  labs(x = "month", y = "average duration (secs)", legend = "membership type", title = "Monthly Average Duration Vs Membership")
+
+```
+
+We'll also create another column chart representing the number of trips per month and separate them by membership:
+
+```{r echo=FALSE, eval=TRUE, cache=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+trips %>% 
+  group_by(membership, year_month) %>% 
+  summarise(num_rides = n()
+            ,avg_duration = mean(duration)) %>% 
+  arrange(membership, year_month)  %>% 
+  ggplot(aes(x = year_month, y = num_rides, fill = membership)) +
+  geom_col(position = "dodge")+
+  scale_y_continuous(trans = "log2")+
+  theme(axis.text.x=element_text(angle=45))+
+  labs(x = "month", y = "number of trips", legend = "membership type", title = "Monthly Number of Trips Vs Membership")
+
+```
+
+> ***Observations:***
+>
+> Member riders have higher trips numbers throughout the whole year excpet in Jun21, Jul21 and Aug21, where casual riders have the most trips.
+>
+> Casual riders have higher trip durations throughout the whole year.
+>
+> `Jul21- Casual Riders`, `Aug21- Casual Riders` and `Sep21- Member Riders` are the top three months with the highest number of trips respectively, with July(21) and August(21) having over 400,000 trips. These segements were for the casual rider group, with the expeption of September(21) which was for the member riders.
+>
+> `Jan22- Casual Riders`, `Feb22- Casual Riders` and `Dec21- Casual Riders` have the lowest number of trips respectively with January(22) and February(22) having less than 50,000 trips. This segment was for the causal rider group.
+>
+> `May21- Casual Riders`, `Jun21- Casual Riders` and `Mar22- Casual Riders` are the months and riders with the highest average duration with May(21) and June(21) having over 2,000 seconds(33 minutes).
+>
+> `Dec21- Member Riders`,`Nov21- Member Riders` and `Feb22- Member Riders` are the months and riders with the lowest average trip durations, all having less than 700 seconds(11 minutes).
+
+## Discussion
+
+From the analysis above, there are a few insights worth diving into further. They are discussed below in more detail:
+
+ - **Membership: There are more member riders than casual riders**
+
+Member riders outnumber casual riders by $758,863$. This could be the primary reason why annual memberships are seen as more profitable than full day or single-ride passes.
+
+ - **Duration: Casual riders have higher trip durations than member riders**
+
+Across all the descriptive statistics (mean, max and median), casual riders have longer trips than member riders. Based on the section above, it could mean that the flexibility in the pricing plan is what attracts casual riders since all trips that were more than 11.5 days can be attributed to casual riders.
+
+ - **Day of the week: Weekends for casual riders, Mid-week for members**
+
+Friday to Sundays are popular for casual riders account for the longest trip durations and highest number fo trips for causal riders. Members on the other hand favour weekdays favouring Tuesday to Thursday with the highest number of trips. Worth noting is that Tuesday has the lowest duration overall, yet has the highest number of trips for members. This further indidcates that long trips do not necessarily mean more profitability.
+
+ - **Month: Member riders have consistently more trips during the year**
+
+Throughout the selected season (May2021 to May2022), the highest number of trips were in July21, August 21 and September 21 and can be attributed to casual riders. Interestingly, the lowest number of trips were in December 21, January 22 and February 22, which can also be attributed to causal riders. Interestingly, casual rider trips surpassed member rider trips in only 3 months: June 21, July 2021 and August 2021. This could mean that there is a season where casual riders appear to rent bikes. It could indicate a holiday season, meaning an influx of either students on summer break, or tourists visiting local attractions.
+
+
+### Recommendations
+1. _Review the revenue brought in by single, full-day and annual memberships._
+
+Given that summer seems to e the time casual riders peak, rather than trying to converting them to annual members, it could make more sense increasing the price of the single and full day passes, or even creating a weekly/monthly/trimester plan that would include the 3 month spike. This could add more revenue options while still ensuring the selling point of pricing flexibility is maintained.
+
+2. _Improving customer information databases._
+
+It's interesting that casual trips increase during certain months of the year and days of the week. It would be interesting to see if majority of members are people who work and causal members are students or tourists. This could explain why annual memberships may not be workable for them and may help in devising more affordable, yet profitable pricing plans. It may also help in anticipating spikes in bike demand.
+
+3. _Add geo-tagging features on the bikes._
+
+This may seem like a big investment, but having a map of the common routes taken by casual and member riders can give an indication of the different routes taken and possibly help in determining if the longer trips are related to things like periodical biking expeditions (weekly, monthly or annually). A good avenue for revenue may be renting out the bikes to the arrangers of the biking competition, or advertising to get more regular customers who are into biking but may either not want to use their personal bikes or may not be able to travel with their bikes for the expeditions.It could also help figure out if member riders are people who live within the area and are simply using the bikes as alternative transport, hence the numerous mid-week trips with short durations.
+
+## Conclusion
+
+In conclusion, we've seen that member riders typically have more trips than causal riders and are active during the week and year-round. Casual riders tend to take longer trips, and are mostly active during summer and during the weekends.
+
+Some recommendations include reviewing pricing plans to determine if flexibility can be maintained while still achieving profitability, improving customer databases and considering investments such as geo-tagging to discover popular routes among the memberships.
